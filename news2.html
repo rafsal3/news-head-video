@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>News Headline Animator</title>
+    <style>
+        /* --- General Page Styling --- */
+        :root {
+            --bg-color: #121212;
+            --sidebar-bg: #1e1e1e;
+            --preview-bg-default: #111111;
+            --text-color: #e0e0e0;
+            --text-color-muted: #888;
+            --border-color: #333;
+            --accent-color: #6a5acd; /* Slate Blue */
+            --accent-color-hover: #5a4bbf;
+            --record-color: #c94040;
+            --record-color-hover: #b03030;
+            --recording-color: #4CAF50;
+            --recording-color-hover: #45a049;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* --- Controls Sidebar --- */
+        #controls-panel {
+            width: 320px;
+            background-color: var(--sidebar-bg);
+            padding: 25px;
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+            overflow-y: auto;
+            flex-shrink: 0;
+            z-index: 10;
+        }
+
+        #controls-panel h1 {
+            margin: 0;
+            font-size: 1.6em;
+            color: var(--text-color);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        #controls-panel h1 svg {
+            fill: var(--accent-color);
+            width: 28px;
+            height: 28px;
+        }
+
+        .control-section {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .input-group label {
+            font-weight: 500;
+            font-size: 0.9em;
+            color: var(--text-color-muted);
+        }
+
+        .input-group input[type="text"],
+        .input-group input[type="number"],
+        .input-group textarea {
+            width: 100%;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background-color: #2a2a2a;
+            color: var(--text-color);
+            font-size: 1em;
+            box-sizing: border-box;
+            transition: border-color 0.2s;
+        }
+
+        .input-group input[type="text"]:focus,
+        .input-group input[type="number"]:focus,
+        .input-group textarea:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+        
+        .input-group textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+        
+        .color-inputs {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 15px;
+        }
+
+        .color-input-wrapper {
+             display: flex;
+             flex-direction: column;
+             align-items: center;
+             gap: 8px;
+        }
+
+        .input-group input[type="color"] {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            width: 50px;
+            height: 30px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            background-color: transparent;
+        }
+        .input-group input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+        .input-group input[type="color"]::-webkit-color-swatch { border: 1px solid var(--border-color); border-radius: 6px;}
+
+
+        /* --- Buttons --- */
+        .button-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: auto; /* Pushes buttons to the bottom */
+            padding-top: 20px;
+        }
+
+        .icon-button {
+            padding: 10px 15px;
+            border-radius: 6px;
+            border: none;
+            font-size: 0.9em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            color: white;
+        }
+        .icon-button svg { width: 18px; height: 18px; fill: currentColor; }
+
+        #generate-btn { background-color: var(--accent-color); grid-column: 1 / -1; }
+        #generate-btn:hover { background-color: var(--accent-color-hover); }
+
+        #templates-btn { background-color: #4a4a52; }
+        #templates-btn:hover { background-color: #5a5a62; }
+
+        #record-btn { background-color: var(--record-color); }
+        #record-btn:hover { background-color: var(--record-color-hover); }
+        #record-btn.recording { background-color: var(--recording-color); }
+        #record-btn.recording:hover { background-color: var(--recording-color-hover); }
+
+        /* --- Templates Drawer --- */
+        #templates-drawer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 300px;
+            height: 100%;
+            background-color: var(--sidebar-bg);
+            border-right: 1px solid var(--border-color);
+            transform: translateX(-100%);
+            transition: transform 0.3s ease-in-out;
+            z-index: 20;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 5px 0 15px rgba(0,0,0,0.2);
+        }
+        #templates-drawer.is-open { transform: translateX(0); }
+        
+        .templates-header {
+            padding: 20px 25px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+        .templates-header h2 { margin: 0; font-size: 1.2em; }
+        #close-drawer-btn { background: none; border: none; color: var(--text-color-muted); cursor: pointer; padding: 5px; }
+        #close-drawer-btn:hover { color: var(--text-color); }
+        #close-drawer-btn svg { width: 24px; height: 24px; fill: currentColor; }
+
+        .templates-grid {
+            padding: 25px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            overflow-y: auto;
+        }
+        .template-thumbnail {
+            aspect-ratio: 16/9;
+            border-radius: 8px;
+            cursor: pointer;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 5px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            border: 1px solid transparent;
+        }
+        .template-thumbnail:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(0,0,0,0.3);
+            border-color: var(--accent-color);
+        }
+        .template-line { width: 70%; height: 8px; border-radius: 4px; background-color: var(--text-color); opacity: 0.7; }
+        .template-highlight { width: 40%; height: 10px; border-radius: 4px; background-color: var(--highlight-color); }
+
+
+        /* --- Preview Area --- */
+        #preview-area {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            position: relative;
+        }
+
+        #instructions {
+            position: absolute;
+            bottom: 20px;
+            font-size: 0.9em;
+            color: #666;
+            max-width: 500px;
+            text-align: center;
+        }
+        
+        #preview-container {
+            width: 100%;
+            max-width: 1280px;
+            aspect-ratio: 16 / 9;
+            background-color: var(--preview-bg-default);
+            color: #E0E0E0;
+            border-radius: 8px;
+            padding: 4%;
+            box-sizing: border-box;
+            font-family: "Georgia", "Times New Roman", Times, serif;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+            display: flex;
+            align-items: stretch;
+            gap: 5%;
+        }
+        
+        #preview-container:-webkit-full-screen { padding: 5%; }
+        #preview-container:fullscreen { padding: 5%; }
+
+        .vertical-border { width: 2px; opacity: 0.25; flex-shrink: 0; transform-origin: bottom; }
+        .content-area { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; }
+        #source-output { font-size: clamp(1rem, 2vw, 1.5rem); font-weight: bold; text-transform: uppercase; letter-spacing: 1px; opacity: 0.8; margin-bottom: 30px; }
+        #title-output { font-size: clamp(1.8rem, 5vw, 4.5rem); font-weight: bold; line-height: 1.2; margin-bottom: 40px; }
+        #date-output { font-size: clamp(0.9rem, 1.8vw, 1.3rem); opacity: 0.7; }
+        
+        /* --- Animation Rules --- */
+        @keyframes revealBorder { from { transform: scaleY(0); } to { transform: scaleY(1); opacity: 0.25; } }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes revealChar { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes revealHighlight { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+        
+        #source-output, #date-output { opacity: 0; }
+        #title-output .char { display: inline-block; opacity: 0; animation-fill-mode: forwards; }
+        .word-highlight { display: inline-block; position: relative; }
+        .highlight-text { position: relative; z-index: 2; padding: 0 0.2em; margin: 0 -0.1em; }
+        .highlight-bg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; background-color: var(--accent-color); border-radius: 4px; transform-origin: left; transform: scaleX(0); animation-fill-mode: forwards; }
+
+    </style>
+</head>
+<body>
+
+    <!-- ==== CONTROLS SIDEBAR ==== -->
+    <aside id="controls-panel">
+        <h1>
+            <svg viewBox="0 0 24 24"><path d="M4,4H20A2,2 0 0,1 22,6V18A2,2 0 0,1 20,20H4A2,2 0 0,1 2,18V6A2,2 0 0,1 4,4M4,6V18H20V6H4M6,8H18V10H6V8M6,12H14V14H6V12Z" /></svg>
+            News Animator
+        </h1>
+
+        <div class="control-section">
+            <div class="input-group">
+                <label for="source-input">Source</label>
+                <input type="text" id="source-input" value="SOURCE: AI BREAKTHROUGHS">
+            </div>
+            <div class="input-group">
+                <label for="title-input">News Title (use new lines for line breaks)</label>
+                <textarea id="title-input">Many Professionals Pursue Certifications
+and Intensive AI Programs</textarea>
+            </div>
+            <div class="input-group">
+                <label for="date-input">Date</label>
+                <input type="text" id="date-input" value="MAY, 15, 2025">
+            </div>
+        </div>
+
+        <div class="control-section">
+             <div class="input-group">
+                <label>Color Palette</label>
+                <div class="color-inputs">
+                    <div class="color-input-wrapper">
+                        <label for="bg-color">Background</label>
+                        <input type="color" id="bg-color" value="#111111">
+                    </div>
+                    <div class="color-input-wrapper">
+                        <label for="text-color">Text</label>
+                        <input type="color" id="text-color" value="#E0E0E0">
+                    </div>
+                    <div class="color-input-wrapper">
+                        <label for="highlight-color">Highlight</label>
+                        <input type="color" id="highlight-color" value="#6a5acd">
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="control-section">
+            <div class="input-group">
+                <label for="end-pause-input">End Pause (sec)</label>
+                <input type="number" id="end-pause-input" value="2" min="0" step="0.5">
+            </div>
+        </div>
+
+
+        <div class="button-group">
+            <button id="templates-btn" class="icon-button">
+                <svg viewBox="0 0 24 24"><path d="M17.5,12A1.5,1.5 0 0,1 16,10.5A1.5,1.5 0 0,1 17.5,9A1.5,1.5 0 0,1 19,10.5A1.5,1.5 0 0,1 17.5,12M14.5,8A1.5,1.5 0 0,1 13,6.5A1.5,1.5 0 0,1 14.5,5A1.5,1.5 0 0,1 16,6.5A1.5,1.5 0 0,1 14.5,8M9.5,8A1.5,1.5 0 0,1 8,6.5A1.5,1.5 0 0,1 9.5,5A1.5,1.5 0 0,1 11,6.5A1.5,1.5 0 0,1 9.5,8M6.5,12A1.5,1.5 0 0,1 5,10.5A1.5,1.5 0 0,1 6.5,9A1.5,1.5 0 0,1 8,10.5A1.5,1.5 0 0,1 6.5,12M12,3A9,9 0 0,0 3,12A9,9 0 0,0 12,21A1.5,1.5 0 0,0 13.5,19.5C13.5,19.08 13.15,18.74 12.75,18.75C10.13,18.9 7.9,16.67 7.75,14.05C7.58,11.23 9.82,8.78 12.59,8.75C15.36,8.72 17.75,11.04 17.75,13.75C17.75,14.16 18.09,14.5 18.5,14.5A1.5,1.5 0 0,0 20,13A9,9 0 0,0 12,3Z" /></svg>
+                Templates
+            </button>
+             <button id="record-btn" class="icon-button">
+                <svg viewBox="0 0 24 24"><path d="M12,12m-3.5,0a3.5,3.5 0 1,0 7,0a3.5,3.5 0 1,0 -7,0" /></svg>
+                Record
+            </button>
+            <button id="generate-btn" class="icon-button">
+                 <svg viewBox="0 0 24 24"><path d="M8,5.14V19.14L19,12.14L8,5.14Z" /></svg>
+                Animate
+            </button>
+        </div>
+    </aside>
+    
+    <!-- ==== TEMPLATES DRAWER ==== -->
+    <div id="templates-drawer">
+        <div class="templates-header">
+            <h2>Color Templates</h2>
+            <button id="close-drawer-btn" title="Close">
+                 <svg viewBox="0 0 24 24"><path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z" /></svg>
+            </button>
+        </div>
+        <div class="templates-grid" id="templates-grid-container">
+            <!-- Templates will be injected here by JS -->
+        </div>
+    </div>
+
+    <!-- ==== PREVIEW AREA ==== -->
+    <main id="preview-area">
+        <div id="preview-container">
+            <div class="vertical-border"></div>
+            <div class="content-area">
+                <div id="source-output"></div>
+                <div id="title-output"></div>
+                <div id="date-output"></div>
+            </div>
+        </div>
+        <p id="instructions">
+            Click <strong>Record</strong> to begin a fullscreen capture. The video will download automatically.
+        </p>
+    </main>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // --- DOM Elements ---
+        const dom = {
+            sourceInput: document.getElementById('source-input'),
+            titleInput: document.getElementById('title-input'),
+            dateInput: document.getElementById('date-input'),
+            bgColorPicker: document.getElementById('bg-color'),
+            textColorPicker: document.getElementById('text-color'),
+            highlightColorPicker: document.getElementById('highlight-color'),
+            endPauseInput: document.getElementById('end-pause-input'),
+            generateBtn: document.getElementById('generate-btn'),
+            recordBtn: document.getElementById('record-btn'),
+            templatesBtn: document.getElementById('templates-btn'),
+            closeDrawerBtn: document.getElementById('close-drawer-btn'),
+            previewContainer: document.getElementById('preview-container'),
+            verticalBorder: document.querySelector('.vertical-border'),
+            contentArea: document.querySelector('.content-area'),
+            sourceOutput: document.getElementById('source-output'),
+            titleOutput: document.getElementById('title-output'),
+            dateOutput: document.getElementById('date-output'),
+            instructionsP: document.getElementById('instructions'),
+            templatesDrawer: document.getElementById('templates-drawer'),
+            templatesGrid: document.getElementById('templates-grid-container')
+        };
+
+        // --- State ---
+        const state = {
+            mediaRecorder: null,
+            recordedChunks: [],
+            isRecording: false,
+            stopTimeoutId: null,
+            originalInstructions: dom.instructionsP.innerHTML
+        };
+        
+        // --- Templates Data ---
+        const templates = [
+            { name: "Slate", bg: "#111111", text: "#E0E0E0", highlight: "#6a5acd" },
+            { name: "Crimson", bg: "#1A1A1D", text: "#F0F0F0", highlight: "#C3073F" },
+            { name: "Oceanic", bg: "#0B2545", text: "#EEF4ED", highlight: "#8DA9C4" },
+            { name: "Newsprint", bg: "#F4F1DE", text: "#3D405B", highlight: "#E07A5F" },
+            { name: "Forest", bg: "#283618", text: "#FEFAE0", highlight: "#606C38" },
+            { name: "Royal", bg: "#1D2D50", text: "#F0F7F4", highlight: "#F8D210" },
+        ];
+
+        // --- Main Animation Function ---
+        function generateAnimation() {
+            return new Promise(resolve => {
+                // 1. Reset animations and state
+                [dom.verticalBorder, dom.sourceOutput, dom.dateOutput, ...dom.titleOutput.querySelectorAll('.char, .highlight-bg')].forEach(el => el.style.animation = 'none');
+                
+                dom.sourceOutput.style.opacity = '0';
+                dom.dateOutput.style.opacity = '0';
+                
+                // Apply colors from pickers
+                const bgColor = dom.bgColorPicker.value;
+                const textColor = dom.textColorPicker.value;
+                const highlightColor = dom.highlightColorPicker.value;
+                
+                dom.previewContainer.style.backgroundColor = bgColor;
+                dom.verticalBorder.style.backgroundColor = textColor;
+                dom.contentArea.style.color = textColor;
+                document.documentElement.style.setProperty('--accent-color', highlightColor);
+                
+                // Populate text
+                dom.sourceOutput.textContent = dom.sourceInput.value;
+                dom.dateOutput.textContent = dom.dateInput.value;
+                dom.titleOutput.innerHTML = '';
+
+                // Build title with char spans
+                const highlightProbability = 0.25;
+                const lines = dom.titleInput.value.split('\n');
+                lines.forEach((line, lineIndex) => {
+                    const words = line.trim().split(' ');
+                    words.forEach((word, wordIndex) => {
+                        if (word.length > 0 && Math.random() < highlightProbability) {
+                            const wrapper = document.createElement('span'); wrapper.className = 'word-highlight';
+                            const textSpan = document.createElement('span'); textSpan.className = 'highlight-text';
+                            for (const char of word) { const charSpan = document.createElement('span'); charSpan.className = 'char'; charSpan.textContent = char; textSpan.appendChild(charSpan); }
+                            const bgSpan = document.createElement('span'); bgSpan.className = 'highlight-bg';
+                            wrapper.appendChild(textSpan); wrapper.appendChild(bgSpan); dom.titleOutput.appendChild(wrapper);
+                        } else {
+                            for (const char of word) { const charSpan = document.createElement('span'); charSpan.className = 'char'; charSpan.textContent = char; dom.titleOutput.appendChild(charSpan); }
+                        }
+                        if (wordIndex < words.length - 1) { dom.titleOutput.insertAdjacentHTML('beforeend', ' '); }
+                    });
+                    if (lineIndex < lines.length - 1) { dom.titleOutput.appendChild(document.createElement('br')); }
+                });
+
+                // 2. Calculate "natural" duration
+                const BORDER_DURATION = 0.4, FADE_IN_DURATION = 0.5, CHAR_STAGGER = 0.03;
+                const CHAR_ANIM_DURATION = 0.5, HIGHLIGHT_DURATION = 0.4, HIGHLIGHT_STAGGER = 0.15, GAP = 0.1;
+                
+                const allChars = dom.titleOutput.querySelectorAll('.char');
+                const highlightBGs = dom.titleOutput.querySelectorAll('.highlight-bg');
+                
+                let timeline = BORDER_DURATION + FADE_IN_DURATION;
+                timeline += (allChars.length > 0 ? ((allChars.length - 1) * CHAR_STAGGER) + CHAR_ANIM_DURATION : 0) + GAP;
+                timeline += FADE_IN_DURATION + GAP;
+                
+                let naturalAnimationEndTime = timeline;
+                if (highlightBGs.length > 0) {
+                    naturalAnimationEndTime += ((highlightBGs.length - 1) * HIGHLIGHT_STAGGER) + HIGHLIGHT_DURATION;
+                }
+                
+                // 3. Apply animations with natural timings
+                requestAnimationFrame(() => {
+                    let currentDelay = 0;
+                    dom.verticalBorder.style.animation = `revealBorder ${BORDER_DURATION}s ease-in forwards`;
+                    currentDelay += BORDER_DURATION;
+                    
+                    dom.sourceOutput.style.animation = `fadeInUp ${FADE_IN_DURATION}s ease-out ${currentDelay}s forwards`;
+                    currentDelay += FADE_IN_DURATION;
+                    
+                    allChars.forEach((char, index) => {
+                        char.style.animation = `revealChar ${CHAR_ANIM_DURATION}s ease-out ${currentDelay + (index * CHAR_STAGGER)}s forwards`;
+                    });
+                    currentDelay += (allChars.length > 0 ? ((allChars.length - 1) * CHAR_STAGGER) + CHAR_ANIM_DURATION : 0) + GAP;
+
+                    dom.dateOutput.style.animation = `fadeInUp ${FADE_IN_DURATION}s ease-out ${currentDelay}s forwards`;
+                    currentDelay += FADE_IN_DURATION + GAP;
+
+                    highlightBGs.forEach((bg, index) => {
+                        const highlightStartTime = currentDelay + (index * HIGHLIGHT_STAGGER);
+                        bg.style.animation = `revealHighlight ${HIGHLIGHT_DURATION}s ease-in ${highlightStartTime}s forwards`;
+                        // *** FIX: No JS is needed to change the text color anymore. It will now inherit correctly. ***
+                    });
+                });
+                
+                resolve(naturalAnimationEndTime * 1000); // Only animation time, not pause
+            });
+        }
+
+        // --- Recording Logic ---
+        async function toggleRecording() {
+            if (state.isRecording) {
+                clearTimeout(state.stopTimeoutId);
+                if (state.mediaRecorder && state.mediaRecorder.state === 'recording') {
+                    state.mediaRecorder.stop();
+                }
+                return;
+            } 
+            
+            try {
+                const endPauseSec = parseFloat(dom.endPauseInput.value) || 0;
+                const endPauseMs = Math.max(0, endPauseSec * 1000);
+
+                const stream = await navigator.mediaDevices.getDisplayMedia({
+                    video: { frameRate: 30, displaySurface: "browser", cursor: "never" },
+                    audio: false, preferCurrentTab: true
+                });
+
+                await dom.previewContainer.requestFullscreen();
+                state.isRecording = true;
+                dom.recordBtn.classList.add('recording');
+                dom.recordBtn.querySelector('svg').innerHTML = `<path d="M6,6H18V18H6V6Z" />`; // Stop icon
+                
+                const animationDurationMs = await generateAnimation();
+                const totalRecordingDuration = animationDurationMs + endPauseMs;
+                
+                dom.instructionsP.innerHTML = `<strong>Recording...</strong> will stop in ${(totalRecordingDuration / 1000).toFixed(1)}s`;
+                document.body.style.cursor = "none";
+                
+                state.mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+                
+                state.mediaRecorder.ondataavailable = (event) => { if (event.data.size > 0) state.recordedChunks.push(event.data); };
+                
+                state.mediaRecorder.onstop = () => {
+                    document.body.style.cursor = "default";
+                    if (document.fullscreenElement) document.exitFullscreen();
+                    const blob = new Blob(state.recordedChunks, { type: 'video/webm' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'news-animation.webm';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    stream.getTracks().forEach(track => track.stop());
+                    
+                    state.isRecording = false;
+                    state.recordedChunks = [];
+                    dom.recordBtn.classList.remove('recording');
+                    dom.recordBtn.querySelector('svg').innerHTML = `<path d="M12,12m-3.5,0a3.5,3.5 0 1,0 7,0a3.5,3.5 0 1,0 -7,0" />`; // Record icon
+                    dom.instructionsP.innerHTML = state.originalInstructions;
+                };
+                
+                state.mediaRecorder.start();
+
+                stream.getVideoTracks()[0].onended = () => { if (state.mediaRecorder.state === "recording") state.mediaRecorder.stop(); };
+
+                state.stopTimeoutId = setTimeout(() => {
+                    if (state.mediaRecorder.state === "recording") state.mediaRecorder.stop();
+                }, totalRecordingDuration);
+
+            } catch (err) {
+                console.error("Error starting screen capture:", err);
+                if (err.name !== 'NotAllowedError') {
+                   alert("Could not start recording. Please grant permission and ensure you are on a secure (https) connection.");
+                }
+                state.isRecording = false;
+                document.body.style.cursor = "default";
+                dom.recordBtn.classList.remove('recording');
+                dom.recordBtn.querySelector('svg').innerHTML = `<path d="M12,12m-3.5,0a3.5,3.5 0 1,0 7,0a3.5,3.5 0 1,0 -7,0" />`;
+                if (document.fullscreenElement) document.exitFullscreen();
+            }
+        }
+        
+        // --- Template UI Logic ---
+        function populateTemplates() {
+            dom.templatesGrid.innerHTML = '';
+            templates.forEach(template => {
+                const thumb = document.createElement('div');
+                thumb.className = 'template-thumbnail';
+                thumb.title = `Apply "${template.name}" template`;
+                thumb.style.backgroundColor = template.bg;
+                thumb.style.color = template.text;
+                
+                thumb.innerHTML = `
+                    <div class="template-line" style="background-color: ${template.text}; opacity: 0.8;"></div>
+                    <div class="template-line" style="width: 50%; background-color: ${template.text}; opacity: 0.8;"></div>
+                    <div class="template-highlight" style="background-color: ${template.highlight};"></div>
+                `;
+
+                thumb.addEventListener('click', () => applyTemplate(template));
+                dom.templatesGrid.appendChild(thumb);
+            });
+        }
+        
+        function applyTemplate(template) {
+            dom.bgColorPicker.value = template.bg;
+            dom.textColorPicker.value = template.text;
+            dom.highlightColorPicker.value = template.highlight;
+            generateAnimation();
+            toggleTemplatesDrawer(false); // Close drawer after selection
+        }
+
+        function toggleTemplatesDrawer(forceState) {
+            const isOpen = dom.templatesDrawer.classList.contains('is-open');
+            if (typeof forceState === 'boolean') {
+                 dom.templatesDrawer.classList.toggle('is-open', forceState);
+            } else {
+                 dom.templatesDrawer.classList.toggle('is-open');
+            }
+        }
+        
+        // --- Event Listeners Setup ---
+        function init() {
+            dom.generateBtn.addEventListener('click', generateAnimation);
+            dom.recordBtn.addEventListener('click', toggleRecording);
+            
+            [dom.sourceInput, dom.titleInput, dom.dateInput, dom.bgColorPicker, dom.textColorPicker, dom.highlightColorPicker, dom.endPauseInput].forEach(input => {
+                input.addEventListener('input', () => {
+                    if (!state.isRecording) generateAnimation();
+                });
+            });
+
+            dom.templatesBtn.addEventListener('click', () => toggleTemplatesDrawer());
+            dom.closeDrawerBtn.addEventListener('click', () => toggleTemplatesDrawer());
+
+            populateTemplates();
+            generateAnimation();
+        }
+
+        init();
+    });
+    </script>
+
+</body>
+</html>
