@@ -267,7 +267,7 @@
         #preview-container:-webkit-full-screen { padding: 5%; }
         #preview-container:fullscreen { padding: 5%; }
 
-        .vertical-border { width: 8px; opacity: 0.25; flex-shrink: 0; transform-origin: bottom; }
+        .vertical-border { width: 8px; opacity: 0.95; flex-shrink: 0; transform-origin: bottom; }
         .content-area { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; }
         #source-output { font-size: clamp(1rem, 2vw, 1.5rem); font-weight: bold; text-transform: uppercase; letter-spacing: 1px; opacity: 0.8; margin-bottom: 30px; }
         #title-output { font-size: clamp(1.8rem, 5vw, 4.5rem); font-weight: bold; line-height: 1.2; margin-bottom: 40px; }
@@ -305,6 +305,11 @@
                 <label for="title-input">News Title (use new lines for line breaks)</label>
                 <textarea id="title-input">Many Professionals Pursue Certifications
 and Intensive AI Programs</textarea>
+            </div>
+             <!-- ADDED: Custom Highlight Input -->
+            <div class="input-group">
+                <label for="highlight-words-input">Words to Highlight (optional)</label>
+                <input type="text" id="highlight-words-input" placeholder="e.g. AI, Programs, Certifications">
             </div>
             <div class="input-group">
                 <label for="date-input">Date</label>
@@ -391,6 +396,8 @@ and Intensive AI Programs</textarea>
             sourceInput: document.getElementById('source-input'),
             titleInput: document.getElementById('title-input'),
             dateInput: document.getElementById('date-input'),
+            // ADDED: Reference to the new highlight words input
+            highlightWordsInput: document.getElementById('highlight-words-input'),
             bgColorPicker: document.getElementById('bg-color'),
             textColorPicker: document.getElementById('text-color'),
             highlightColorPicker: document.getElementById('highlight-color'),
@@ -453,13 +460,31 @@ and Intensive AI Programs</textarea>
                 dom.dateOutput.textContent = dom.dateInput.value;
                 dom.titleOutput.innerHTML = '';
 
+                // --- MODIFIED: Highlight Logic ---
+                // Get and parse custom words to highlight.
+                const customHighlightWords = dom.highlightWordsInput.value.trim();
+                const highlightList = customHighlightWords ? customHighlightWords.split(',').map(w => w.trim().toLowerCase()).filter(w => w) : [];
+
                 // Build title with char spans
-                const highlightProbability = 0.25;
+                const randomHighlightProbability = 0.25;
                 const lines = dom.titleInput.value.split('\n');
                 lines.forEach((line, lineIndex) => {
                     const words = line.trim().split(' ');
                     words.forEach((word, wordIndex) => {
-                        if (word.length > 0 && Math.random() < highlightProbability) {
+                        if (word.length === 0) return;
+
+                        // Determine if this word should be highlighted
+                        let shouldHighlight = false;
+                        if (highlightList.length > 0) {
+                            // Match against the custom list (case-insensitive, punctuation-insensitive)
+                            const cleanWord = word.replace(/[^\w\s]/gi, '').toLowerCase();
+                            shouldHighlight = highlightList.includes(cleanWord);
+                        } else {
+                            // Fallback to random highlighting if the custom list is empty
+                            shouldHighlight = Math.random() < randomHighlightProbability;
+                        }
+
+                        if (shouldHighlight) {
                             const wrapper = document.createElement('span'); wrapper.className = 'word-highlight';
                             const textSpan = document.createElement('span'); textSpan.className = 'highlight-text';
                             for (const char of word) { const charSpan = document.createElement('span'); charSpan.className = 'char'; charSpan.textContent = char; textSpan.appendChild(charSpan); }
@@ -472,6 +497,7 @@ and Intensive AI Programs</textarea>
                     });
                     if (lineIndex < lines.length - 1) { dom.titleOutput.appendChild(document.createElement('br')); }
                 });
+
 
                 // 2. Calculate "natural" duration
                 const BORDER_DURATION = 0.4, FADE_IN_DURATION = 0.5, CHAR_STAGGER = 0.03;
@@ -509,7 +535,6 @@ and Intensive AI Programs</textarea>
                     highlightBGs.forEach((bg, index) => {
                         const highlightStartTime = currentDelay + (index * HIGHLIGHT_STAGGER);
                         bg.style.animation = `revealHighlight ${HIGHLIGHT_DURATION}s ease-in ${highlightStartTime}s forwards`;
-                        // *** FIX: No JS is needed to change the text color anymore. It will now inherit correctly. ***
                     });
                 });
                 
@@ -634,7 +659,8 @@ and Intensive AI Programs</textarea>
             dom.generateBtn.addEventListener('click', generateAnimation);
             dom.recordBtn.addEventListener('click', toggleRecording);
             
-            [dom.sourceInput, dom.titleInput, dom.dateInput, dom.bgColorPicker, dom.textColorPicker, dom.highlightColorPicker, dom.endPauseInput].forEach(input => {
+            // MODIFIED: Added the new input to the list of controls that trigger a live update
+            [dom.sourceInput, dom.titleInput, dom.dateInput, dom.highlightWordsInput, dom.bgColorPicker, dom.textColorPicker, dom.highlightColorPicker, dom.endPauseInput].forEach(input => {
                 input.addEventListener('input', () => {
                     if (!state.isRecording) generateAnimation();
                 });
